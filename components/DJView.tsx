@@ -70,7 +70,7 @@ export const DJView: React.FC<DJViewProps> = ({ user, onExit }) => {
   };
 
   const checkMatch = (req: SongRequest) => {
-    const content = `${req.songName} ${req.artist} ${req.note}`.toLowerCase();
+    const content = `${req.songName} ${req.artist} ${req.vibe} ${req.note}`.toLowerCase();
     return prefs.genres.some(tag => content.includes(tag));
   };
 
@@ -201,7 +201,14 @@ export const DJView: React.FC<DJViewProps> = ({ user, onExit }) => {
                           <span className="text-[10px] text-gray-500 uppercase tracking-tighter">Guest: {req.userName}</span>
                         </div>
                         <h3 className="text-2xl font-heading font-bold uppercase tracking-tight">{req.songName}</h3>
-                        <p className="text-lg text-gray-400 mb-3">{req.artist}</p>
+                        <p className="text-lg text-gray-400 mb-1">{req.artist}</p>
+                        {req.vibe && (
+                          <div className="mb-3">
+                            <span className="text-[10px] border border-white/40 px-2 py-0.5 uppercase tracking-widest font-medium">
+                              Vibe: {req.vibe}
+                            </span>
+                          </div>
+                        )}
                         {req.note && (
                           <div className="bg-black/40 p-3 text-xs text-gray-300 border-l-2 border-gray-600 italic">
                             "{req.note}"

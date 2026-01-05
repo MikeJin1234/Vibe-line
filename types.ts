@@ -5,6 +5,7 @@ export interface SongRequest {
   id: string;
   songName: string;
   artist: string;
+  vibe: string;
   note: string;
   userId: string;
   userName: string;
