@@ -76,33 +76,41 @@ export const DJView: React.FC<DJViewProps> = ({ user, onExit }) => {
 
   const processedRequests = useMemo(() => {
     return [...requests].sort((a, b) => {
-      // First priority: Status (pending first)
-      if (a.status === 'pending' && b.status !== 'pending') return -1;
-      if (a.status !== 'pending' && b.status === 'pending') return 1;
+      // Priority 1: Status (Pending > Accepted > Completed > Paid/Rejected)
+      const statusOrder = { 'pending': 0, 'accepted': 1, 'completed': 2, 'paid': 3, 'rejected': 3 };
+      if (statusOrder[a.status] !== statusOrder[b.status]) {
+        return statusOrder[a.status] - statusOrder[b.status];
+      }
       
-      // Second priority: Matches for pending requests
+      // Priority 2: High Bid (For pending requests)
       if (a.status === 'pending' && b.status === 'pending') {
+        const aBid = parseFloat(a.bidAmount || '0');
+        const bBid = parseFloat(b.bidAmount || '0');
+        if (aBid !== bBid) return bBid - aBid;
+        
+        // Priority 3: Matches
         const aMatch = checkMatch(a);
         const bMatch = checkMatch(b);
         if (aMatch && !bMatch) return -1;
         if (!aMatch && bMatch) return 1;
       }
       
-      // Third priority: Timestamp
+      // Priority 4: Timestamp
       return b.timestamp - a.timestamp;
     });
   }, [requests, prefs]);
 
   const pendingCount = requests.filter(r => r.status === 'pending').length;
+  const totalBids = requests.reduce((sum, req) => sum + (req.status === 'paid' ? parseFloat(req.bidAmount || '0') : 0), 0);
 
   return (
-    <div className="min-h-screen bg-black text-white p-6 md:p-12 max-w-6xl mx-auto flex flex-col">
+    <div className="min-h-screen bg-black text-white p-6 md:p-12 max-w-7xl mx-auto flex flex-col">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 border-b border-white pb-8 gap-4">
         <div>
           <h1 className="text-5xl md:text-7xl font-heading font-black italic tracking-tighter uppercase">DECK CTRL</h1>
-          <p className="text-sm text-gray-500 uppercase tracking-[0.3em] mt-2">Active Session: {user.name} @ Main Stage</p>
+          <p className="text-sm text-gray-500 uppercase tracking-[0.3em] mt-2">Active Session: {user.name} @ {totalBids.toFixed(2)} USD EARNED</p>
         </div>
-        <div className="flex gap-4 w-full md:w-auto">
+        <div className="flex flex-wrap gap-4 w-full md:w-auto">
           <button 
             onClick={() => setIsEditingPrefs(!isEditingPrefs)}
             className={`flex-1 md:flex-none text-xs border px-6 py-2 transition-all uppercase tracking-widest font-bold ${isEditingPrefs ? 'bg-white text-black border-white' : 'border-white hover:bg-white hover:text-black'}`}
@@ -170,7 +178,10 @@ export const DJView: React.FC<DJViewProps> = ({ user, onExit }) => {
         <div className="lg:col-span-2 space-y-8">
           <div className="flex justify-between items-center border-l-4 border-white pl-4">
             <h2 className="text-2xl font-heading font-bold uppercase">Requests Queue</h2>
-            <span className="bg-white text-black text-xs font-bold px-2 py-1">{pendingCount} PENDING</span>
+            <div className="flex gap-2">
+              <span className="bg-white text-black text-xs font-bold px-2 py-1 uppercase">{pendingCount} PENDING</span>
+              <span className="bg-orange-600 text-white text-xs font-bold px-2 py-1 uppercase">BIDS ACTIVE</span>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -181,34 +192,53 @@ export const DJView: React.FC<DJViewProps> = ({ user, onExit }) => {
             ) : (
               processedRequests.map((req) => {
                 const isMatch = checkMatch(req);
+                const isHighBid = parseFloat(req.bidAmount || '0') > 0;
+                
                 return (
                   <div key={req.id} className={`group border transition-all duration-300 relative ${
                     req.status === 'pending' 
-                      ? isMatch ? 'border-white border-2 shadow-[0_0_15px_rgba(255,255,255,0.2)] bg-white/10' : 'border-white/20 bg-white/5'
-                      : req.status === 'accepted' ? 'border-green-500 bg-green-500/5' : 'border-white/5 opacity-40'
+                      ? isHighBid ? 'border-orange-500 border-2 bg-orange-500/5' : isMatch ? 'border-white border-2 bg-white/10' : 'border-white/20 bg-white/5'
+                      : req.status === 'accepted' ? 'border-green-500 bg-green-500/5' : req.status === 'paid' ? 'border-white opacity-100 bg-white/10' : 'border-white/5 opacity-40'
                   } p-6`}>
-                    {isMatch && req.status === 'pending' && (
-                      <div className="absolute -top-3 left-4 bg-white text-black text-[9px] font-black px-2 py-0.5 tracking-[0.2em] uppercase">
-                        Vibe Match
+                    {isHighBid && req.status === 'pending' && (
+                      <div className="absolute -top-3 left-4 bg-orange-500 text-black text-[9px] font-black px-2 py-0.5 tracking-[0.2em] uppercase shadow-lg">
+                        HIGH PRIORITY BID
                       </div>
                     )}
+                    
                     <div className="flex flex-col md:flex-row justify-between gap-6">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <span className="text-[10px] bg-white text-black px-1.5 font-bold">
-                            {new Date(req.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          <span className={`text-[10px] px-1.5 font-bold ${req.status === 'paid' ? 'bg-green-500 text-black' : 'bg-white text-black'}`}>
+                            {req.status === 'paid' ? 'PAYMENT RECEIVED' : new Date(req.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                           <span className="text-[10px] text-gray-500 uppercase tracking-tighter">Guest: {req.userName}</span>
                         </div>
-                        <h3 className="text-2xl font-heading font-bold uppercase tracking-tight">{req.songName}</h3>
+                        
+                        <div className="flex items-baseline gap-4">
+                          <h3 className="text-2xl font-heading font-bold uppercase tracking-tight">{req.songName}</h3>
+                          {req.bidAmount && (
+                            <span className="text-xl font-bold text-orange-500 tracking-tighter">
+                              {req.bidAmount} {req.bidCurrency}
+                            </span>
+                          )}
+                        </div>
+                        
                         <p className="text-lg text-gray-400 mb-1">{req.artist}</p>
-                        {req.vibe && (
-                          <div className="mb-3">
+                        
+                        <div className="flex items-center gap-3 mb-3">
+                          {req.vibe && (
                             <span className="text-[10px] border border-white/40 px-2 py-0.5 uppercase tracking-widest font-medium">
                               Vibe: {req.vibe}
                             </span>
-                          </div>
-                        )}
+                          )}
+                          {req.bidNetwork && (
+                            <span className="text-[9px] text-gray-500 uppercase font-mono bg-white/5 px-2">
+                              via {req.bidNetwork}
+                            </span>
+                          )}
+                        </div>
+
                         {req.note && (
                           <div className="bg-black/40 p-3 text-xs text-gray-300 border-l-2 border-gray-600 italic">
                             "{req.note}"
@@ -236,18 +266,25 @@ export const DJView: React.FC<DJViewProps> = ({ user, onExit }) => {
                         {req.status === 'accepted' && (
                           <button 
                             onClick={() => handleAction(req.id, 'completed')}
-                            className="flex-1 md:flex-none px-4 py-2 bg-white text-black hover:bg-black hover:text-white border border-white text-xs font-bold uppercase transition-all"
+                            className="flex-1 md:flex-none px-4 py-2 bg-orange-500 text-black hover:bg-white border border-orange-500 text-xs font-black uppercase transition-all"
                           >
-                            Played
+                            Set Played
                           </button>
                         )}
-                        <button 
-                          disabled={isGenerating}
-                          onClick={() => handleVibeCheck(req)}
-                          className="flex-1 md:flex-none px-4 py-2 border border-white/40 text-white/40 hover:border-white hover:text-white text-[9px] font-bold uppercase transition-all"
-                        >
-                          {isGenerating ? 'Analyzing...' : 'Vibe Check'}
-                        </button>
+                        {req.status === 'completed' && (
+                          <div className="flex flex-col items-center justify-center p-2 border border-white/20 bg-white/5 text-[9px] uppercase tracking-widest text-gray-400">
+                            Waiting for User Confirmation
+                          </div>
+                        )}
+                        {req.status !== 'paid' && req.status !== 'rejected' && (
+                          <button 
+                            disabled={isGenerating}
+                            onClick={() => handleVibeCheck(req)}
+                            className="flex-1 md:flex-none px-4 py-2 border border-white/40 text-white/40 hover:border-white hover:text-white text-[9px] font-bold uppercase transition-all"
+                          >
+                            {isGenerating ? 'Analyzing...' : 'Vibe Check'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -259,32 +296,37 @@ export const DJView: React.FC<DJViewProps> = ({ user, onExit }) => {
 
         <div className="space-y-8">
            <div className="border-l-4 border-white pl-4">
-            <h2 className="text-2xl font-heading font-bold uppercase">Analytics</h2>
+            <h2 className="text-2xl font-heading font-bold uppercase">Deck Earnings</h2>
           </div>
           <div className="bg-white/5 border border-white/10 p-6 space-y-6">
             <div>
-              <p className="text-[10px] text-gray-500 uppercase mb-1">Total Requests</p>
-              <p className="text-4xl font-heading font-bold">{requests.length}</p>
+              <p className="text-[10px] text-gray-500 uppercase mb-1">Total Payouts Released</p>
+              <p className="text-4xl font-heading font-bold text-green-500 tracking-tighter">${totalBids.toFixed(2)}</p>
             </div>
             <div>
-              <p className="text-[10px] text-gray-500 uppercase mb-1">Match Ratio</p>
-              <p className="text-4xl font-heading font-bold">
-                {requests.length > 0 ? Math.round((requests.filter(r => checkMatch(r)).length / requests.length) * 100) : 0}%
+              <p className="text-[10px] text-gray-500 uppercase mb-1">Queue Value (Pending)</p>
+              <p className="text-4xl font-heading font-bold text-orange-500 tracking-tighter">
+                ${requests.filter(r => r.status === 'pending' || r.status === 'accepted').reduce((s, r) => s + parseFloat(r.bidAmount || '0'), 0).toFixed(2)}
               </p>
             </div>
             <div className="pt-4 border-t border-white/10">
-              <p className="text-[10px] text-gray-500 uppercase mb-4 tracking-widest">Active Genres</p>
-              <div className="flex flex-wrap gap-1">
-                {prefs.genres.map(g => (
-                  <span key={g} className="text-[8px] border border-white/30 px-1 py-0.5 uppercase">{g}</span>
-                ))}
-                {prefs.genres.length === 0 && <span className="text-[8px] text-gray-600 italic">NONE SET</span>}
+              <p className="text-[10px] text-gray-500 uppercase mb-4 tracking-widest">Revenue Channels</p>
+              <div className="space-y-2">
+                {['Camp Network', 'BSC', 'Base'].map(net => {
+                  const val = requests.filter(r => r.bidNetwork === net && r.status === 'paid').reduce((s, r) => s + parseFloat(r.bidAmount || '0'), 0);
+                  return (
+                    <div key={net} className="flex justify-between items-center text-[10px] uppercase">
+                      <span className="text-gray-400">{net}</span>
+                      <span className="font-bold">${val.toFixed(2)}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
             <div className="pt-4 border-t border-white/10">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-ping"></div>
-                <span className="text-xs font-bold tracking-widest">SYSTEM ONLINE</span>
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <span className="text-xs font-bold tracking-widest">SECURE SETTLEMENT ON</span>
               </div>
             </div>
           </div>

@@ -1,5 +1,5 @@
 
-export type RequestStatus = 'pending' | 'accepted' | 'completed' | 'rejected';
+export type RequestStatus = 'pending' | 'accepted' | 'completed' | 'rejected' | 'paid';
 
 export interface SongRequest {
   id: string;
@@ -11,6 +11,9 @@ export interface SongRequest {
   userName: string;
   status: RequestStatus;
   timestamp: number;
+  bidAmount?: string;
+  bidCurrency?: 'USDT' | 'USDC';
+  bidNetwork?: 'Camp Network' | 'BSC' | 'Base';
 }
 
 export type AppRole = 'dj' | 'audience' | null;
